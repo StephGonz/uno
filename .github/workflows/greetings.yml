@@ -1,0 +1,13 @@
+name: Greetings
+
+on: [pull_request, issues]
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: 'Hi! Looks like we have an issue. Stand by while we figure this out.'' first issue'
+        pr-message: 'Hi! Welcome to StephGonz fork of Uno. Hope your pull has good code.'' first pr'

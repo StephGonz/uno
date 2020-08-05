@@ -185,6 +185,7 @@
             </v-card>
 
             <div id=myCards>
+            <h2> Your Cards </h2>
               <Card
                 v-for="(card, i) in gameState.player_cards"
                 :key="i"

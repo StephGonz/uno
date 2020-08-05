@@ -35,8 +35,8 @@
         </v-list-item>
 
         <v-divider></v-divider>
-            
-        <div v-if="gameState.all_players !== undefined">  
+
+        <div v-if="gameState.all_players !== undefined">
           <v-list-item
             v-for="player in gameState.all_players"
             :key="player.id"
@@ -69,6 +69,9 @@
           <!-- Game stats -->
           <v-row>
             <v-card class="ma-3 pa-6" outlined tile>
+              <h2>
+                Game Information
+              </h2>
               <p>
                 Current Game id: {{ gameState.game_id }}
               </p>
@@ -77,9 +80,6 @@
               </p>
               <p>
                 Your Name: {{ playerName }}
-              </p>
-              <p v-if="gameState.draw_pile != undefined">
-                Cards Remaining in Draw Pile: {{ gameState.draw_pile.length }}
               </p>
               <p>
                 <v-switch v-model="pane_lock" :label="`Unlock Players Pane`"></v-switch>
@@ -99,15 +99,35 @@
             </v-card>
           </v-row>
 
-          <!-- Current Card and actions -->
+          <!-- Discard Pile and actions -->
           <v-col cols="12" v-if="gameState.status === 'Playing'">
             <v-row v-if="gameState.current_card != undefined">
               <v-card class="center-text ma-3 pa-6" outlined tile>
+                <h2>
+                  Discard Pile
+                </h2>
                 <Card
                   :number="gameState.current_card.value"
                   :key="gameState.current_card.color"
                   :color="gameState.current_card.color"
                 />
+              </v-card>
+            </v-row>
+          </v-col>
+
+          <!-- Deck and actions -->
+          <v-col cols="12" v-if="gameState.status === 'Playing'">
+            <v-row v-if="gameState.current_card != undefined">
+              <v-card class="center-text ma-3 pa-6" outlined tile>
+                <h2>
+                  Deck
+                </h2>
+                <p v-if="gameState.draw_pile != undefined">
+                  There are {{ gameState.draw_pile.length }} cards left in the deck.
+                </p>
+                <v-btn @click.native="drawCard">
+                  Draw a Card
+                </v-btn>
               </v-card>
             </v-row>
           </v-col>
@@ -120,6 +140,7 @@
             outlined
             tile
           >
+            <h2>How To Play</h2>
             <v-card-text v-if="gameState.status === 'Waiting For Players'">
               <v-row v-if="gameState.creator != undefined && gameState.creator.id == gameState.player_id">
                 You are the creator of the game. When you are ready: <v-btn @click.native="startGame">Start Game</v-btn>
@@ -130,7 +151,16 @@
             </v-card-text>
 
             <v-card-text v-if="gameState.status === 'Playing' && gameState.player_id === gameState.current_player.id">
-              Click to play a card from your hand or <v-btn @click.native="drawCard">Draw from deck</v-btn>
+              <div>Select a card with 
+                <span class="keycap">←</span>
+                <span class="keycap">↑</span>
+                <span class="keycap">→</span>
+                <span class="keycap">↓</span>
+                or the mouse.
+              </div>
+              <div>Press <span class="keycap">Enter</span> or click to play the selected card.</div>
+              <div>Press <span class="keycap">D</span> to draw a card.</div>
+              <div>Press <span class="keycap">C</span> to open chat (<span class="keycap">Esc</span> to close).</div>
             </v-card-text>
 
             <v-card-text v-else-if="gameState.status === 'Playing'">
@@ -148,19 +178,30 @@
 
               <v-row v-else class="pl-3">
                 Organize Cards
-                <v-btn class="org-btn" @click.native="orgByColor">by Color</v-btn>
-                <v-btn class="org-btn" @click.native="orgByNum">by Number</v-btn>
-                <v-btn class="org-btn" @click.native="orgOff">Off</v-btn>
+                <v-btn @click.native="orgByColor">by Color</v-btn>
+                <v-btn @click.native="orgByNum">by Number</v-btn>
+                <v-btn @click.native="orgOff">Off</v-btn>
               </v-row>
             </v-card>
 
-            <Card
-              v-for="(card, i) in gameState.player_cards"
-              :key="i"
-              :number="card.value"
-              :color="card.color"
-              @click.native=" (card.value == 'W' || card.value == 'W4') ? selectWildColor(card) : playCard(card)"
-            ></Card>
+            <div id=myCards>
+              <Card
+                v-for="(card, i) in gameState.player_cards"
+                :key="i"
+                :number="card.value"
+                :color="card.color"
+                :tabindex="(i == 0) ? 0 : -1"
+                @click.native=" (card.value == 'W' || card.value == 'W4')
+                                ? selectWildColor(card) 
+                                : playCard(card)"
+                @keydown.arrow-right.native="swapCardFocus(i, i + 1)"
+                @keydown.arrow-down.native="swapCardFocus(i, i + 1)"
+                @keydown.arrow-left.native="swapCardFocus(i, i - 1)"
+                @keydown.arrow-up.native="swapCardFocus(i, i - 1)"
+                @keypress.enter.native="playCard(card)"
+                class="playerCard"
+              ></Card>
+            </div>
           </div>
           <div v-if="gameState.status === 'Finished'">
             <Results v-bind:players="{
@@ -180,9 +221,10 @@
 
     <div 
       v-if="gameState.status === 'Playing' && gameState.current_player != undefined" 
-      @click="chatOpen = !chatOpen"
-      class="float-button">
-        Chat
+      @click="chatOpen = !chatOpen" 
+      class="float-button" 
+      tabindex="0">
+      Chat
     </div>
     <v-dialog
       v-model="chooseColorDialog.visible"
@@ -265,7 +307,7 @@ export default {
       cards: [],
 
       chatOpen: false,
-      
+
       playerName: "",
       chooseColorDialog: {
         visible: false,
@@ -278,9 +320,7 @@ export default {
       loadingHand: false,
       colors: { 'red': 0, 'blue': 1 , 'green': 2, 'yellow': 3, 'wild': 4},
       values: { '1' : 0, '2' : 1, '3' : 2, '4' : 3, '5' : 4, '6' : 5, '7' : 6, '8' : 7, '9' : 8, 'S' : 9, 'R' : 10, 'W' : 11, 'D2' : 12, 'W4' : 13},
-    
       helpMenu: false,
-      
       snackbar: false,
       snackbarText: "",
       newMessageName: "",
@@ -312,6 +352,7 @@ export default {
         this.loadingHand = false
       }
     },
+
     orgOff() {
       if (this.sortByColor == true || this.sortByNum == true) {
         this.loadingHand = true;
@@ -319,6 +360,7 @@ export default {
       this.sortByNum = false;
       this.sortByColor = false;
     },
+
     orgByNum() {
       if (this.gameState.player_cards != undefined) {
         this.gameState.player_cards.sort((a, b) => (this.colors[a.color] > this.colors[b.color]) ? 1 : -1 );
@@ -328,6 +370,7 @@ export default {
       this.sortByNum = true;
       this.sortByColor = false;
     },
+
     orgByColor() {
       if (this.gameState.player_cards != undefined) {
         this.gameState.player_cards.sort((a, b) => (this.values[a.value] < this.values[b.value]) ? 1 : -1 );
@@ -356,24 +399,41 @@ export default {
       this.playCard(this.chooseColorDialog.card);
     },
 
-    async playCard(card) { 
-      console.log("Playing card", card);     
+    async playCard(card) {
+      console.log("Playing card", card);
       let res = await unoService.playCard(this.$route.params.id, card.value, card.color);
-      
+
       if (res.data) {
         this.gameState = res.data;
       }
     },
+
     sendMessage() {
       this.snackbarText = this.username + " says: " + this.newMessage;
       this.snackbar = true;
     },
+
     async drawCard() {
       let res = await unoService.drawCard(this.$route.params.id);
-      
+
       if (res.data) {
         this.gameState = res.data;
       }
+    },
+
+    swapCardFocus(currentIndex, swapIndex) {
+      var cards = document.getElementById("myCards").children
+      var card = cards[currentIndex]
+      var other = cards[((swapIndex % cards.length) + cards.length) % cards.length]
+
+      var tmp = other.getAttribute("tabindex")
+      other.setAttribute("tabindex", card.getAttribute("tabindex"))
+      card.setAttribute("tabindex", tmp)
+
+      // This assumes that we just swapped a tabindex 0 card with a tabindex -1 
+      // card, which is currently true, but might not always be the case. 
+      // There's probably a better solution here.
+      other.focus()
     },
 
     // Getting a hint, added by the creator of the Help Button
@@ -391,6 +451,8 @@ export default {
     }, 2000);
   },
   mounted() {
+    document.addEventListener("keyup", _keyListener.bind(this))
+
     this.$emit('sendGameID', this.$route.params.id)
     document.html.classList.add('no-scroll')
 
@@ -401,13 +463,62 @@ export default {
     .catch(err => {
       console.err("Could not get player name from assigned token\n", err)
     })
+
   },
   beforeDestroy (){
     if(this.updateInterval){
       clearInterval(this.updateInterval);
     }
+
+    document.removeEventListener("keyup", _keyListener)
   },
 };
+
+function _keyListener(e) {
+  // Handle closing chat, because chat eats all other keyboard inputs.
+  if (this.chatOpen) {
+    if (e.key === "Escape") {
+      this.chatOpen = false
+    }
+  }
+  else { // Handle all of the other keyboard inputs.
+    switch (e.key) {
+      case "c":
+        if (!this.chatOpen)
+        this.chatOpen = true
+        console.log(document.getElementById("chatMessage"))
+        document.getElementById("chatMessage").focus()
+        break;
+
+      case "d":
+        if (this.gameState.draw_pile != undefined) {
+          e.preventDefault()
+
+          this.drawCard()
+        }
+        break;
+
+      case "ArrowDown":
+      case "ArrowRight":
+        if (!document.activeElement.className.includes("playerCard")) {
+          e.preventDefault()
+
+          document.getElementById("myCards").firstElementChild.focus()
+        }
+        break;
+
+      case "ArrowUp":
+      case "ArrowLeft":
+        if (!document.activeElement.className.includes("playerCard")) {
+          e.preventDefault()
+
+          document.getElementById("myCards").lastElementChild.focus()
+        }
+        break;
+    }
+  }
+}
+
 </script>
 
 <style scoped>
@@ -442,7 +553,7 @@ export default {
 }
 
 .game-wrapper {
-  display: flex; 
+  display: flex;
   min-height: 100%;
   background-color: black;
 }
@@ -471,6 +582,23 @@ export default {
   font-weight: bold;
 }
 
+/* Keycap style source: http://www.tutorius.com/keycap-style-css */
+span.keycap {
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  -o-border-radius: 4px;
+  -khtml-border-radius: 4px;
+  white-space: nowrap;
+  border: 1px solid #aaa;
+  border-style: outset;
+  border-radius: 4px;
+  padding: 0px 3px 1px 3px;
+  margin: 0px 0px 0px 0px;
+  vertical-align: baseline;
+  line-height: 1.8em;
+  /* background: #fbfbfb; */
+}
+
 /* CSS for the Help buttons */
 @import url(https://fonts.googleapis.com/css?family=Source+Sans+Pro:900);
   
@@ -493,9 +621,6 @@ export default {
     min-width: 160px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1;
-  }
-  .org-btn {
-    margin: 10px;
   }
   /* Show the dropdown menu on hover */
   .dropdown:hover .dropdown_content, .hintbtn a:hover {display: block;}
